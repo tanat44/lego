@@ -61,8 +61,7 @@ export class OrthoOrbit {
       const newPos = this.cameraStartPosition.clone().applyQuaternion(rotYaw);
 
       // pitch
-      const PITCH_SPEED = 20;
-      const rotPitch = new Quaternion();
+      const PITCH_SPEED = 40;
       newPos.z += (-screenMove.y * PITCH_SPEED) / Math.sqrt(this.zoom);
 
       // apply

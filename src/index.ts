@@ -1,2 +1,5 @@
-import { Manager } from "./Manager";
-new Manager();
+import { Graphic } from "./Graphic/Graphic";
+import { Lego } from "./Lego/Lego";
+
+const graphic = new Graphic();
+new Lego(graphic);

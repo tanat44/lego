@@ -16,12 +16,11 @@ import {
   Vector3,
   WebGLRenderer,
 } from "three";
-import { Lego } from "./Lego";
 import { OrthoCamera } from "./OrthoCamera";
 
 const GRID_SIZE = 100;
 
-export class Manager {
+export class Graphic {
   scene: Scene;
   orthoCamera: OrthoCamera;
   renderer: WebGLRenderer;
@@ -32,7 +31,6 @@ export class Manager {
     this.addTestObject();
     this.onWindowResize();
     this.animate();
-    new Lego(this.scene);
   }
 
   drawCube(pos: Vector3, color: string) {
