@@ -3,17 +3,20 @@ import {
   BoxGeometry,
   BufferGeometry,
   Color,
+  DirectionalLight,
   DoubleSide,
   GridHelper,
   Line,
   LineBasicMaterial,
   Mesh,
   MeshBasicMaterial,
+  MeshLambertMaterial,
   PlaneGeometry,
   Scene,
   Vector3,
   WebGLRenderer,
 } from "three";
+import { Lego } from "./Lego";
 import { OrthoCamera } from "./OrthoCamera";
 
 const GRID_SIZE = 100;
@@ -29,11 +32,12 @@ export class Manager {
     this.addTestObject();
     this.onWindowResize();
     this.animate();
+    new Lego(this.scene);
   }
 
   drawCube(pos: Vector3, color: string) {
     const geometry2 = new BoxGeometry(1, 1, 1);
-    const material2 = new MeshBasicMaterial({ color: color });
+    const material2 = new MeshLambertMaterial({ color: color });
     const cube2 = new Mesh(geometry2, material2);
     cube2.position.copy(pos);
     this.scene.add(cube2);
@@ -66,11 +70,18 @@ export class Manager {
     this.drawLine(new Vector3(0, 10, 0), "green");
     this.drawCube(new Vector3(0, 0, 10), "blue");
     this.drawLine(new Vector3(0, 0, 10), "blue");
-    this.drawPlane();
   }
 
   setupLighting() {
-    this.scene.add(new AmbientLight(0xf0f0f0));
+    this.scene.add(new AmbientLight(0xffffff));
+
+    const light1 = new DirectionalLight(0xffffff, 5);
+    light1.position.set(100, 50, 100);
+    this.scene.add(light1);
+
+    const light2 = new DirectionalLight(0xffffff, 2);
+    light2.position.set(100, -50, 10);
+    this.scene.add(light2);
   }
 
   setupScene() {

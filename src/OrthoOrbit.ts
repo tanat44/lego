@@ -16,6 +16,7 @@ export class OrthoOrbit {
 
   private cameraStartPosition: Vector3 | null = null;
   private mouseDownScreen: Vector2 | null = null;
+  private viewCenter: Vector3 | null = null;
   private zoom: number = 1;
 
   constructor(camera: OrthographicCamera, domElement: HTMLElement) {
@@ -26,7 +27,9 @@ export class OrthoOrbit {
     this.domElement.addEventListener("mousedown", this.onMouseDown.bind(this));
     this.domElement.addEventListener("mousemove", this.onMouseMove.bind(this));
     this.domElement.addEventListener("mouseup", this.onMouseUp.bind(this));
-    this.domElement.addEventListener("wheel", this.onWheel.bind(this));
+    this.domElement.addEventListener("wheel", this.onWheel.bind(this), {
+      passive: true,
+    });
     window.addEventListener("resize", this.onWindowResize.bind(this));
   }
 
@@ -34,6 +37,7 @@ export class OrthoOrbit {
 
   private onMouseDown(event: MouseEvent): void {
     this.mouseDownScreen = this.getMouseScreenPosition(event);
+    this.viewCenter = this.findGroundIntersection(new Vector2());
     this.cameraStartPosition = this.camera.position.clone();
   }
 
@@ -63,7 +67,10 @@ export class OrthoOrbit {
 
       // apply
       this.camera.position.copy(newPos);
-      this.camera.lookAt(new Vector3());
+
+      if (this.viewCenter) {
+        this.camera.lookAt(this.viewCenter);
+      } else this.camera.lookAt(new Vector3());
     } else if (button == 2) {
       // right click = pan
       const move = newWorldPos
