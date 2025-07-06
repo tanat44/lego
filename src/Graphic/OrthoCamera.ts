@@ -1,11 +1,12 @@
 import { OrthographicCamera } from "three";
+import { Graphic } from "./Graphic";
 import { OrthoOrbit } from "./OrthoOrbit";
 
 export class OrthoCamera {
   camera: OrthographicCamera;
   orbit: OrthoOrbit;
 
-  constructor(domElement: HTMLElement) {
+  constructor(graphic: Graphic) {
     // camera
     this.camera = new OrthographicCamera();
     this.camera.position.set(-10, -20, 5);
@@ -13,6 +14,6 @@ export class OrthoCamera {
     this.camera.lookAt(0, 0, 0);
 
     // orbit
-    this.orbit = new OrthoOrbit(this.camera, domElement);
+    this.orbit = new OrthoOrbit(this.camera, graphic);
   }
 }

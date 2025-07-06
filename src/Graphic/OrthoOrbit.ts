@@ -1,11 +1,14 @@
 import {
+  Box3,
   OrthographicCamera,
   Plane,
   Quaternion,
   Raycaster,
+  ShaderMaterial,
   Vector2,
   Vector3,
 } from "three";
+import { Graphic } from "./Graphic";
 
 const ORBIT_RADIUS = 100;
 
@@ -13,16 +16,18 @@ export class OrthoOrbit {
   private camera: OrthographicCamera;
   private domElement: HTMLElement;
   private rayCaster: Raycaster;
+  private graphic: Graphic;
 
   private cameraStartPosition: Vector3 | null = null;
   private mouseDownScreen: Vector2 | null = null;
   private viewCenter: Vector3 | null = null;
   private zoom: number = 1;
 
-  constructor(camera: OrthographicCamera, domElement: HTMLElement) {
+  constructor(camera: OrthographicCamera, graphic: Graphic) {
     this.camera = camera;
-    this.domElement = domElement;
+    this.domElement = graphic.renderer.domElement;
     this.rayCaster = new Raycaster();
+    this.graphic = graphic;
 
     this.domElement.addEventListener("mousedown", this.onMouseDown.bind(this));
     this.domElement.addEventListener("mousemove", this.onMouseMove.bind(this));
@@ -83,6 +88,41 @@ export class OrthoOrbit {
         .multiplyScalar(ORBIT_RADIUS);
       this.camera.position.set(newCamera.x, newCamera.y, newCamera.z);
     }
+
+    this.updateNearFar();
+    this.camera.updateProjectionMatrix();
+  }
+
+  private updateNearFar(): void {
+    const sceneBox = new Box3().setFromObject(this.graphic.scene);
+    const low = sceneBox.min;
+    const high = sceneBox.max;
+
+    const corners: Vector3[] = [
+      new Vector3(low.x, low.y, low.z),
+      new Vector3(high.x, low.y, low.z),
+      new Vector3(low.x, high.y, low.z),
+      new Vector3(low.x, low.y, high.z),
+      new Vector3(high.x, high.y, low.z),
+      new Vector3(high.x, low.y, high.z),
+      new Vector3(low.x, high.y, high.z),
+      new Vector3(high.x, high.y, high.z),
+    ];
+
+    const forward = this.camera.getWorldDirection(new Vector3(0, 0, -1));
+    const distances = corners.map((corner) =>
+      corner.sub(this.camera.position).dot(forward)
+    );
+    const minDistance = Math.min(...distances);
+    const maxDistance = Math.max(...distances);
+    this.camera.near = minDistance;
+    this.camera.far = maxDistance;
+
+    const material = this.graphic.customOutline.fsQuad
+      .material as ShaderMaterial;
+    material.uniforms.cameraNear.value = minDistance;
+    material.uniforms.cameraFar.value = maxDistance;
+    // console.log(`Near: ${this.camera.near}, Far: ${this.camera.far}`);
   }
 
   private onMouseUp(event: MouseEvent): void {
@@ -157,8 +197,9 @@ export class OrthoOrbit {
     //     .multiplyScalar(ORBIT_RADIUS);
     //   this.camera.position.set(newCameraPos.x, newCameraPos.y, newCameraPos.z);
     // }
-    this.camera.updateProjectionMatrix();
     this.zoom = zoom;
+    this.updateNearFar();
+    this.camera.updateProjectionMatrix();
   }
 
   private onWindowResize(): void {

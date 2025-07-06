@@ -1,8 +1,10 @@
+import { GUI } from "dat.gui";
 import {
   AmbientLight,
   BoxGeometry,
   BufferGeometry,
   Color,
+  DepthTexture,
   DirectionalLight,
   DoubleSide,
   GridHelper,
@@ -13,17 +15,29 @@ import {
   MeshLambertMaterial,
   PlaneGeometry,
   Scene,
+  Vector2,
   Vector3,
   WebGLRenderer,
+  WebGLRenderTarget,
 } from "three";
+import { EffectComposer } from "three/examples/jsm/postprocessing/EffectComposer";
+import { RenderPass } from "three/examples/jsm/postprocessing/RenderPass";
+import { ShaderPass } from "three/examples/jsm/postprocessing/ShaderPass";
+import { FXAAShader } from "three/examples/jsm/shaders/FXAAShader";
+import { CustomOutlinePass } from "./CustomOutlinePass.js";
 import { OrthoCamera } from "./OrthoCamera";
 
-const GRID_SIZE = 100;
+const GRID_SIZE = 20;
 
 export class Graphic {
   scene: Scene;
   orthoCamera: OrthoCamera;
+
+  // rendering
   renderer: WebGLRenderer;
+  composer: EffectComposer;
+  effectFXAA: ShaderPass;
+  customOutline: CustomOutlinePass;
 
   constructor() {
     this.setupScene();
@@ -31,6 +45,7 @@ export class Graphic {
     this.addTestObject();
     this.onWindowResize();
     this.animate();
+    this.setupGui();
   }
 
   drawCube(pos: Vector3, color: string) {
@@ -87,13 +102,48 @@ export class Graphic {
     this.scene.background = new Color(0xf0f0f0);
     const gridHelper = new GridHelper(GRID_SIZE, GRID_SIZE);
     gridHelper.rotateX(Math.PI / 2);
+    gridHelper.material.depthTest = false;
     this.scene.add(gridHelper);
 
-    this.renderer = new WebGLRenderer({ antialias: true });
+    this.renderer = new WebGLRenderer();
     this.renderer.setPixelRatio(window.devicePixelRatio);
     this.renderer.shadowMap.enabled = true;
-    this.orthoCamera = new OrthoCamera(this.renderer.domElement);
-    this.scene.add(this.orthoCamera.camera);
+    this.orthoCamera = new OrthoCamera(this);
+
+    // post processing
+    const depthTexture = new DepthTexture(
+      window.innerWidth,
+      window.innerHeight
+    );
+    const renderTarget = new WebGLRenderTarget(
+      window.innerWidth,
+      window.innerHeight,
+      {
+        depthTexture: depthTexture,
+        depthBuffer: true,
+      }
+    );
+
+    // Initial render pass.
+    this.composer = new EffectComposer(this.renderer, renderTarget);
+    const pass = new RenderPass(this.scene, this.orthoCamera.camera);
+    this.composer.addPass(pass);
+
+    // Outline pass.
+    this.customOutline = new CustomOutlinePass(
+      new Vector2(window.innerWidth, window.innerHeight),
+      this.scene,
+      this.orthoCamera.camera
+    );
+    this.composer.addPass(this.customOutline);
+
+    // Antialias pass.
+    this.effectFXAA = new ShaderPass(FXAAShader);
+    this.effectFXAA.uniforms["resolution"].value.set(
+      1 / window.innerWidth,
+      1 / window.innerHeight
+    );
+    // this.composer.addPass(this.effectFXAA);
 
     document.body.appendChild(this.renderer.domElement);
     window.addEventListener("resize", this.onWindowResize.bind(this));
@@ -106,10 +156,56 @@ export class Graphic {
 
   onWindowResize() {
     this.renderer.setSize(window.innerWidth, window.innerHeight);
+    this.composer.setSize(window.innerWidth, window.innerHeight);
+    this.effectFXAA.setSize(window.innerWidth, window.innerHeight);
+    this.customOutline.setSize(window.innerWidth, window.innerHeight);
   }
 
   animate() {
     requestAnimationFrame(() => this.animate());
-    this.renderer.render(this.scene, this.orthoCamera.camera);
+    this.composer.render();
+  }
+
+  private setupGui() {
+    // Set up GUI controls
+    const gui = new GUI({ width: 300, closed: true });
+    const params = {
+      mode: { Mode: 0 },
+      FXAA: true,
+      outlineColor: 0xffffff,
+      depthBias: 1,
+      depthMult: 1,
+      normalBias: 1,
+      normalMult: 1.0,
+    };
+
+    const uniforms = (this.customOutline.fsQuad.material as any).uniforms;
+    gui
+      .add(params.mode, "Mode", {
+        Outlines: 0,
+        "Original scene": 1,
+        "Depth buffer": 2,
+        "Normal buffer": 3,
+      })
+      .onChange(function (value) {
+        uniforms.debugVisualize.value = value;
+      });
+
+    gui.addColor(params, "outlineColor").onChange(function (value) {
+      uniforms.outlineColor.value.set(value);
+    });
+
+    gui.add(params, "depthBias", 0.0, 5).onChange(function (value) {
+      uniforms.multiplierParameters.value.x = value;
+    });
+    gui.add(params, "depthMult", 0.0, 10).onChange(function (value) {
+      uniforms.multiplierParameters.value.y = value;
+    });
+    gui.add(params, "normalBias", 0.0, 5).onChange(function (value) {
+      uniforms.multiplierParameters.value.z = value;
+    });
+    gui.add(params, "normalMult", 0.0, 10).onChange(function (value) {
+      uniforms.multiplierParameters.value.w = value;
+    });
   }
 }
