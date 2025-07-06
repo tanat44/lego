@@ -1,4 +1,11 @@
-import { OrthographicCamera, Plane, Raycaster, Vector2, Vector3 } from "three";
+import {
+  OrthographicCamera,
+  Plane,
+  Quaternion,
+  Raycaster,
+  Vector2,
+  Vector3,
+} from "three";
 
 const ORBIT_RADIUS = 100;
 
@@ -9,8 +16,6 @@ export class OrthoOrbit {
 
   private cameraStartPosition: Vector3 | null = null;
   private mouseDownScreen: Vector2 | null = null;
-  private mouseWorldLast: Vector3 | null = null;
-  private mouseButton: number = 0; // 1 = left click, 2 = right click
   private zoom: number = 1;
 
   constructor(camera: OrthographicCamera, domElement: HTMLElement) {
@@ -29,27 +34,40 @@ export class OrthoOrbit {
 
   private onMouseDown(event: MouseEvent): void {
     this.mouseDownScreen = this.getMouseScreenPosition(event);
-    const pos = this.unproject(this.mouseDownScreen);
-    if (!pos) return;
-
     this.cameraStartPosition = this.camera.position.clone();
-    this.mouseButton = event.button;
-    this.mouseWorldLast = pos;
-    new Vector2(event.clientX, event.clientY);
   }
 
   private onMouseMove(event: MouseEvent): void {
-    if (!this.mouseWorldLast) return;
+    if (!this.mouseDownScreen) return;
 
     const newScreenPos = this.getMouseScreenPosition(event);
     const newWorldPos = this.unproject(newScreenPos);
     if (!newWorldPos) return;
 
-    if (this.mouseButton == 1) {
-      // left click
-    } else if (this.mouseButton == 2) {
-      // right click
-      const move = this.unproject(newScreenPos.clone())
+    const button = event.buttons;
+    if (button == 1) {
+      // left click = rotate
+
+      const screenMove = newScreenPos.clone().sub(this.mouseDownScreen);
+
+      // yaw
+      const YAW_SPEED = 5;
+      const rotYaw = new Quaternion();
+      rotYaw.setFromAxisAngle(new Vector3(0, 0, 1), -screenMove.x * YAW_SPEED);
+      const newPos = this.cameraStartPosition.clone().applyQuaternion(rotYaw);
+
+      // pitch
+      const PITCH_SPEED = 20;
+      const rotPitch = new Quaternion();
+      newPos.z += (-screenMove.y * PITCH_SPEED) / Math.sqrt(this.zoom);
+
+      // apply
+      this.camera.position.copy(newPos);
+      this.camera.lookAt(new Vector3());
+    } else if (button == 2) {
+      // right click = pan
+      const move = newWorldPos
+        .clone()
         .sub(this.unproject(this.mouseDownScreen))
         .multiplyScalar(2);
       const newCamera = this.cameraStartPosition
@@ -59,12 +77,10 @@ export class OrthoOrbit {
         .multiplyScalar(ORBIT_RADIUS);
       this.camera.position.set(newCamera.x, newCamera.y, newCamera.z);
     }
-
-    // console.log("Mouse move event:", event);
   }
 
   private onMouseUp(event: MouseEvent): void {
-    this.mouseWorldLast = null;
+    this.mouseDownScreen = null;
   }
 
   private onWheel(event: WheelEvent): void {
@@ -97,8 +113,8 @@ export class OrthoOrbit {
     return mousePosition;
   }
 
-  private getMouseWorldPosition(screenPosition: Vector2): Vector3 {
-    this.rayCaster.setFromCamera(screenPosition, this.camera);
+  private findGroundIntersection(screenPosition: Vector2): Vector3 {
+    this.rayCaster.setFromCamera(screenPosition.clone(), this.camera);
 
     let point = new Vector3();
     if (
